@@ -1,31 +1,11 @@
-# meshops.py - tessellate and decimate the active Part with trimesh, through an
-# OBJ round trip (SculptForge 0.13.8+).
+# SPDX-FileCopyrightText: 2026 
+# SPDX-License-Identifier: CC0-1.0
 #
-# SculptForge's own subdivide and decimate run in the app. This script does the
-# same work outside it, with the trimesh library (Scripts\site-packages):
-#
-#   1. save_obj      the visible Parts, one "o" object each;
-#   2. trimesh       keeps the active Part's mesh, subdivides it (each level
-#                    splits every triangle in four), then simplifies it with
-#                    fast-simplification (quadric edge collapse);
-#   3. part_append   brings the result back as a new Part beside the source,
-#                    which can be hidden to compare the two.
-#
-# Advantage over the built-in commands: the wanted percentage is reached even on
-# very dense meshes (one call to the library can stop short, so it is repeated),
-# and the mesh goes through a real file, which another program could read too.
-#
-# An OBJ holds geometry only: masks, hidden faces, paint colours, UVs of other
-# maps and sculpt layers stay in the app, so the new Part starts plain. The
-# export covers every visible Part, so a heavy scene writes a heavy file.
-#
-# Install the libraries once (SculptForge's embedded Python 3.13 has no pip):
-#   py -3.13 -m pip install --target "<Documents>\SculptForge\Scripts\site-packages" ^
-#       numpy trimesh manifold3d fast-simplification
-#
-# Launch: File > Script > meshops, then the "Mesh ops" button (top shelf, My
-# Panel, F3 palette). Requirement: Enable Python scripts in Preferences.
-# One undo step per Part: the source keeps its own, the new Part is one more.
+# Written in 2026. To the extent possible under law, the author(s) have dedicated 
+# all copyright and related and neighboring rights to this software to the public 
+# domain worldwide. This software is distributed without any warranty.
+# You should have received a copy of the CC0 Public Domain Dedication along with this software. 
+# If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
 
 import os
 import shutil
@@ -36,7 +16,6 @@ import sculptforge as sf
 np = None
 trimesh = None
 LIBS_ERROR = ""
-
 
 def _add_site_packages():
     """Put the Scripts folder's site-packages on sys.path, if it is missing.
@@ -61,7 +40,6 @@ def _add_site_packages():
         if os.path.isdir(candidate) and candidate not in sys.path:
             sys.path.append(candidate)
 
-
 def _load_libraries():
     global np, trimesh, LIBS_ERROR
     try:
@@ -80,21 +58,17 @@ def _load_libraries():
     except Exception as exc:
         LIBS_ERROR = "%s (tried: %s)" % (exc, sf.scripts_folder())
 
-
 _load_libraries()
 
-# ---------------------------------------------------------------------------
-# Defaults (the panel replaces them when the button is clicked)
-# ---------------------------------------------------------------------------
-LEVELS = 1        # tessellate levels (0-4): each one multiplies triangles by 4
-KEEP = 100        # decimate: percent of triangles kept (1-100; 100 = off)
-HIDE_SOURCE = False   # hide the source Part once the new one is there
-SUFFIX = "_ops"   # name of the new Part: <source name><suffix>
+LEVELS = 1
+KEEP = 100
+HIDE_SOURCE = False
+SUFFIX = "_ops"
 
 MAX_LEVELS = 4
-MAX_FACES = 40_000_000   # refuse to build a mesh the app would choke on
-PASSES = 8               # decimation passes, to reach small targets exactly
-UNIT_TOLERANCE = 1.5     # beyond this ratio, the OBJ was read in other units
+MAX_FACES = 40_000_000
+PASSES = 8
+UNIT_TOLERANCE = 1.5
 
 PRESETS = (
     ("Tessellate x4", 1, 100),
@@ -103,10 +77,6 @@ PRESETS = (
     ("Decimate 10 %", 0, 10),
 )
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 def _panel_value(control, fallback):
     """Value of a panel control, or the default value."""
     try:
@@ -114,7 +84,6 @@ def _panel_value(control, fallback):
     except Exception:
         return fallback
     return fallback if value is None else value
-
 
 def _diagonal(vertices):
     """Length of the bounding box diagonal of a vertex array (0 if empty)."""
@@ -129,7 +98,6 @@ def _diagonal(vertices):
     zs = [p[2] for p in vertices]
     sx, sy, sz = max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs)
     return (sx * sx + sy * sy + sz * sz) ** 0.5
-
 
 def _find_geometry(geometries, name):
     """Key of the geometry that holds `name`, or None.
@@ -147,7 +115,6 @@ def _find_geometry(geometries, name):
         return next(iter(geometries))
     return None
 
-
 def _pick_mesh(loaded, name):
     """The Trimesh of `name` in what trimesh.load() returned, or None."""
     if isinstance(loaded, trimesh.Trimesh):
@@ -157,14 +124,13 @@ def _pick_mesh(loaded, name):
         if key is None:
             return None
         mesh = loaded.geometry[key].copy()
-        for node in loaded.graph.nodes_geometry:      # bake the node transform
+        for node in loaded.graph.nodes_geometry:
             transform, geometry_name = loaded.graph[node]
             if geometry_name == key:
                 mesh.apply_transform(transform)
                 break
         return mesh
     return None
-
 
 def _decimate(mesh, target):
     """Simplify `mesh` down to `target` faces, in passes.
@@ -182,11 +148,10 @@ def _decimate(mesh, target):
         except Exception as exc:
             print("Mesh ops: decimation stopped (%s)." % exc)
             break
-        if len(mesh.faces) >= before:                 # no progress: give up
+        if len(mesh.faces) >= before:
             break
         mesh = _drop_degenerate(mesh)
     return mesh
-
 
 def _drop_degenerate(mesh):
     """Remove the zero-area faces a collapse can leave behind.
@@ -202,7 +167,6 @@ def _drop_degenerate(mesh):
         pass
     return mesh
 
-
 def _unique_name(taken, wanted):
     """`wanted`, made unique against the Part names in `taken`."""
     if wanted not in taken:
@@ -212,10 +176,6 @@ def _unique_name(taken, wanted):
         count += 1
     return "%s_%d" % (wanted, count)
 
-
-# ---------------------------------------------------------------------------
-# The command
-# ---------------------------------------------------------------------------
 def mesh_ops(levels=LEVELS, keep=KEEP, hide_source=HIDE_SOURCE):
     """Tessellate then decimate the active Part through an OBJ round trip.
 
@@ -269,16 +229,13 @@ def mesh_ops(levels=LEVELS, keep=KEEP, hide_source=HIDE_SOURCE):
     source_obj = os.path.join(folder, "source.obj")
     result_obj = os.path.join(folder, "result.obj")
     try:
-        # 1. out of the app
+
         try:
             sf.run("save_obj", path=source_obj)
         except Exception as exc:
             print("Mesh ops: the OBJ export failed (%s)." % exc)
             return None
 
-        # 2. trimesh does the work
-        # split_objects: one geometry per OBJ "o", which save_obj writes per
-        # Part; without it trimesh merges every Part into a single mesh.
         loaded = trimesh.load(source_obj, process=False, split_objects=True)
         mesh = _pick_mesh(loaded, name)
         if mesh is None or len(mesh.faces) == 0:
@@ -306,7 +263,6 @@ def mesh_ops(levels=LEVELS, keep=KEEP, hide_source=HIDE_SOURCE):
         mesh = _drop_degenerate(mesh)
         mesh.export(result_obj)
 
-        # 3. back into the app
         taken = [p["name"] for p in sf.document().parts]
         new_name = _unique_name(taken, name + SUFFIX)
         try:
@@ -323,9 +279,6 @@ def mesh_ops(levels=LEVELS, keep=KEEP, hide_source=HIDE_SOURCE):
     added = int(new_part["triangles"])
     new_diagonal = _diagonal(doc.vertices)
 
-    # The OBJ is unit-less: save_obj writes the scene's own unit, part_append
-    # assumes metres. The Part's size says whether the two agreed (decimation
-    # moves the bounding box by a few percent, never by half).
     factor = (source_diagonal / new_diagonal) if new_diagonal > 0 else 0.0
     if factor and (factor > UNIT_TOLERANCE or factor < 1.0 / UNIT_TOLERANCE):
         try:
@@ -345,7 +298,6 @@ def mesh_ops(levels=LEVELS, keep=KEEP, hide_source=HIDE_SOURCE):
           % (new_part["name"], added, added / 1e6, before))
     return new_part["name"]
 
-
 def _run_from_panel():
     try:
         levels = int(_panel_value("levels", LEVELS))
@@ -361,7 +313,6 @@ def _run_from_panel():
         hide_source=bool(_panel_value("hide_source", HIDE_SOURCE)),
     )
 
-
 def _preset_button(levels, keep):
     """Callback of a preset button: its own levels and percentage."""
     return lambda: mesh_ops(
@@ -369,10 +320,6 @@ def _preset_button(levels, keep):
         keep=keep,
         hide_source=bool(_panel_value("hide_source", HIDE_SOURCE)))
 
-
-# ---------------------------------------------------------------------------
-# Interface (SculptForge 0.13.8+)
-# ---------------------------------------------------------------------------
 def _declare_ui():
     sf.ui.action(
         "meshops.run", "Mesh ops", _run_from_panel, icon="wand",
@@ -384,7 +331,7 @@ def _declare_ui():
     panel.separator()
     panel.slider("levels", "Tessellate levels (x4 triangles each, 0 = off)",
                  LEVELS, 0, MAX_LEVELS, integer=True)
-    # A slider label is a printf format, so a literal "%" is written "%%".
+
     panel.slider("keep", "Decimate - keep (%% of triangles, 100 = off)",
                  KEEP, 1, 100, integer=True)
     panel.checkbox("hide_source", "Hide the source Part", HIDE_SOURCE)
@@ -400,7 +347,6 @@ def _declare_ui():
 
     sf.ui.place("meshops.run", "top")
     sf.ui.place("meshops", "my_panel")
-
 
 if hasattr(sf, "ui"):
     _declare_ui()

@@ -1,14 +1,19 @@
+# SPDX-FileCopyrightText: 2026 
+# SPDX-License-Identifier: CC0-1.0
+#
+# Written in 2026. To the extent possible under law, the author(s) have dedicated 
+# all copyright and related and neighboring rights to this software to the public 
+# domain worldwide. This software is distributed without any warranty.
+# You should have received a copy of the CC0 Public Domain Dedication along with this software. 
+# If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
+
 import sculptforge as sf
 import sys
 
 from PySide6 import QtWidgets
 
-
-# Module-level references: keep the dialog alive and track the pump timer
-# so a re-run can clean up the previous one.
 DIALOG = None
 TIMER_ID = None
-
 
 class PartsDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
@@ -41,11 +46,9 @@ class PartsDialog(QtWidgets.QDialog):
         row = self.part_list.currentRow()
         if row < 0:
             return
-        # Safe: Qt slots run inside processEvents, which SculptForge calls on its main thread.
+
         sf.run("part_select", index=row)
         sf.run("subdivide")
-
-
 
 def stop_pump():
     global TIMER_ID
@@ -53,13 +56,11 @@ def stop_pump():
         sf.ui.cancel_timer(TIMER_ID)
         TIMER_ID = None
 
-
 def fn(*args, **kwargs):
     global DIALOG, TIMER_ID
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
-    # Clean up a previous dialog and pump before starting new ones.
     stop_pump()
     if DIALOG is not None:
         DIALOG.close()
@@ -72,9 +73,7 @@ def fn(*args, **kwargs):
     def pump():
         app.processEvents()
 
-    # SculptForge's main-thread timer drives Qt's event loop. Never call app.exec().
     TIMER_ID = sf.ui.timer(pump, 30)
-
 
 if __name__ == '__main__':
     sf.ui.action("pyside_test", 'Pyside Test', fn, help="test pyside integration")

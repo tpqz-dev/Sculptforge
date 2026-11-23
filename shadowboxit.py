@@ -1,84 +1,37 @@
-# blobit.py - port of the ZBrush plugin "Zblobit" for SculptForge 0.13.8+
+# SPDX-FileCopyrightText: 2026 
+# SPDX-License-Identifier: CC0-1.0
 #
-# The original plugin (D:\...\ZScripts\PluginDev\blobit\Zblobit.txt)
-# does this:
-#   1. mask an area of a subtool;
-#   2. delete the subdivision levels (Del Lower / Del Higher);
-#   3. isolate, then thicken the masked area (s.Dynamic, s.Thickness, s.Apply);
-#   4. send it to ShadowBox (or Dynamesh) to make a closed volume;
-#   5. create polygroups, optionally merge with the current subtool;
-#   6. soften the shape (Contrast -100).
-#
-# The source Part is never deleted or hidden: it keeps exactly the visibility
-# it had before the operation (visible or hidden), and the extracted shell is
-# added next to it. The "Hide the source Part" checkbox hides it on purpose.
-#
-# In SculptForge, the "extract" command already covers step 3: it builds a
-# closed shell from the masked area, with thickness, edge smoothing and a
-# "both sides" option. That is the default mode here: fast, faithful to the
-# silhouette, and directly sculptable.
-#
-# ShadowBox itself (the intersection of three silhouettes) does not exist in
-# SculptForge. The "Voxel remesh" option gives the practical equivalent: it
-# closes and evens out the shell into a uniform surface, the way ShadowBox and
-# Dynamesh do in the plugin. To start from a 2D silhouette, the native
-# equivalent command is "image_inflate" (Image > Inflate).
-#
-# Once the mesh exists, five finishing steps are always run:
-#   1. a Contrast pass at 100 (SculptForge has no Contrast command, so it goes
-#      through Balloon, the same mapping used for the plugin's Contrast -100);
-#   2. a coarse voxel remesh at 32, which evens the surface out;
-#   3. a Quad Remesh at the value of the slider (400 by default);
-#   4. Make Symmetric (Tool > Geometry > Symmetry), mirrored across the X plane
-#      through the origin - a panel checkbox turns it off;
-#   5. a second Quad Remesh, which rebuilds clean quads after the mirror cut
-#      the mesh.
-#
-# Launch: File > Script > blobit
-#   then the "Blob it" button on the top shelf, in My Panel, in the command
-#   palette (F3) and in File > Script > blobit.
-#   Below the button, the "Reshape: Balloon" button row (-100 to 100 in steps
-#   of 20) inflates (positive) or deflates (negative) the active Part, like
-#   Tool > Reshape > Balloon; the 0 button goes back to the starting shape.
-# To have it at every start-up: Edit > Preferences > Scripts >
-#   tick blobit under "Run at start-up" (then Trust this version).
-# Requirement: Edit > Preferences > Scripts > Enable Python scripts.
-#
-# The whole process is a single undo step (Ctrl+Z), except "Merge with the Part
-# above": part_merge_down is not undoable.
+# Written in 2026. To the extent possible under law, the author(s) have dedicated 
+# all copyright and related and neighboring rights to this software to the public 
+# domain worldwide. This software is distributed without any warranty.
+# You should have received a copy of the CC0 Public Domain Dedication along with this software. 
+# If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
 
 import sculptforge as sf
 
-# ---------------------------------------------------------------------------
-# Defaults (the panel replaces them when the button is clicked)
-# ---------------------------------------------------------------------------
-THICKNESS = 0.0766    # shell thickness: fraction of the longest side (0.0766 = 7.66 %)
-SMOOTH = 24           # edge smoothing of the extraction (0-50)
-BOTH_SIDES = True     # shell on both sides of the surface (extract "double")
+THICKNESS = 0.0766
+SMOOTH = 24
+BOTH_SIDES = True
 
-VOXEL = True          # voxel remesh: approximates ShadowBox / Dynamesh
-VOXEL_RES = 53        # voxels across the longest side (32-512)
-POLISH = 10           # surface polish after the remesh (0-100)
-ROUND = 0             # rounding, the plugin's Contrast -100 equivalent (0-100)
+VOXEL = True
+VOXEL_RES = 53
+POLISH = 10
+ROUND = 0
 
-CONTRAST = 100        # Contrast pass on the new mesh (0 = off)
-FINAL_VOXEL = 32      # coarse voxel remesh before the quad remesh (0 = off)
-SYMMETRIC = True      # Make Symmetric just before the quad remesh
-SYMMETRY_AXIS = "x"   # mirror plane through the world origin: x, y, z or xz
+CONTRAST = 100
+FINAL_VOXEL = 32
+SYMMETRIC = True
+SYMMETRY_AXIS = "x"
 SYMMETRY_AXES = ("x", "y", "z", "xy", "xz", "yz")
-QUADREMESH = 400      # final Quad Remesh target polygon count (0 = off)
+QUADREMESH = 400
 
-GROUP = True          # one face group per piece (GroupVisible)
-MERGE = False         # merge with the Part above (automerge)
-HIDE_SOURCE = False   # False = the source Part keeps its original visibility
-FREEZE_LEVELS = True  # delete the subdivision levels (Del Lower/Higher)
+GROUP = True
+MERGE = False
+HIDE_SOURCE = False
+FREEZE_LEVELS = True
 
-RESULT_SUFFIX = "_SB"  # name of the shell: "<source Part>_SB"
+RESULT_SUFFIX = "_SB"
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 def _mask_stats(mask):
     """(masked vertices, total), with or without NumPy."""
     if mask is None:
@@ -88,7 +41,6 @@ def _mask_stats(mask):
     except (AttributeError, TypeError):
         return sum(1 for v in mask if float(v) > 0.5), len(mask)
 
-
 def _try(command, **params):
     """Run a command without stopping the script if it fails."""
     try:
@@ -96,10 +48,9 @@ def _try(command, **params):
         if message:
             print("  " + str(message))
         return True
-    except Exception as exc:                       # sf.CommandError, ValueError...
+    except Exception as exc:
         print("  " + command + " skipped: " + str(exc))
         return False
-
 
 def _quad_remesh(quads, group, stage):
     """Run one Quad Remesh pass (skipped when quads is 0)."""
@@ -108,7 +59,6 @@ def _quad_remesh(quads, group, stage):
     if not _try("qremesh", target=quads, keep_groups=bool(group)):
         print("  Quad remesh (%s) left out; the mesh keeps its current topology."
               % stage)
-
 
 def shadowbox_it(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
                  voxel=VOXEL, resolution=VOXEL_RES, polish=POLISH,
@@ -149,11 +99,9 @@ def shadowbox_it(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
     print("  Thickness: %.2f %% of the longest side (%.4f)."
           % (float(thickness) * 100.0, float(thickness)))
 
-    # 1. Del Lower / Del Higher from the plugin: a mesh without levels.
     if freeze_levels:
         _try("subdiv_freeze")
 
-    # 2. s.Dynamic + s.Thickness + s.Apply: the closed shell.
     try:
         sf.run("extract",
                thickness=float(thickness),
@@ -170,17 +118,14 @@ def shadowbox_it(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
               "(masked area too small, or entirely hidden?).")
         return None
 
-    # extract inserts the shell just below the source Part.
     result_index = min(source_index + 1, len(doc.parts) - 1)
 
-    # 3. The plugin's mask is cleared after the operation.
-    sf.run("mask_clear")                       # the source is still active here
+    sf.run("mask_clear")
 
     sf.run("part_select", index=result_index)
     sf.run("part_rename", to=target)
-    sf.run("mask_clear")                       # in case the shell inherited the mask
+    sf.run("mask_clear")
 
-    # 4. ShadowBox / Dynamesh: voxel remesh, then finishing.
     if voxel:
         sf.run("remesh", resolution=int(round(float(resolution))))
     if polish > 0:
@@ -188,31 +133,18 @@ def shadowbox_it(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
     if round_form > 0:
         sf.run("deform_balloon", amount=int(round(float(round_form))), masked=False)
 
-    # 5. Contrast pass. ZBrush's Tool > Deformation > Contrast has no
-    #    equivalent command in SculptForge: like the plugin's Contrast -100
-    #    ("rounder form", mapped to Balloon above), +100 goes through Balloon,
-    #    which fills the form out.
     if contrast:
         sf.run("deform_balloon", amount=int(round(float(contrast))), masked=False)
 
-    # 6. Coarse voxel remesh: evens the surface out before retopology.
     if final_voxel > 0:
         sf.run("remesh", resolution=int(round(float(final_voxel))))
 
-    # 7. GroupVisible: one group per connected piece (after the last remesh,
-    #    so the groups match the geometry the quad remesh works on).
     if group:
         _try("facegroup_by_connectivity")
 
-    # 8. Quad Remesh: clean all-quad topology.
     quads = int(round(float(quadremesh)))
     _quad_remesh(quads, group, "first pass")
 
-    # 9. Make Symmetric (Tool > Geometry > Symmetry): keeps the half on the +
-    #    side of the plane through the world origin, mirrors it and welds the
-    #    seam. The Part must straddle that plane, otherwise half of it is
-    #    replaced by a mirrored copy of the other half. The mirror cuts the
-    #    quads, so a second Quad Remesh rebuilds clean topology afterwards.
     if symmetric:
         axis = symmetry_axis if symmetry_axis in SYMMETRY_AXES else "x"
         if axis != symmetry_axis:
@@ -224,30 +156,24 @@ def shadowbox_it(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
         else:
             print("  Make Symmetric left out; the mesh keeps its own symmetry.")
 
-    # 10. automerge from the plugin (SelectUp + MergeDown), or kept visibility.
     if merge:
         sf.run("part_select", index=source_index)
-        sf.run("part_merge_down")              # not undoable: see the header
+        sf.run("part_merge_down")
         final_index = source_index
     else:
-        # The source Part keeps exactly the visibility it had before the
-        # operation; only the "Hide the source Part" checkbox hides it.
+
         sf.run("part_visibility", index=source_index,
                visible=False if hide_source else source_visible)
         final_index = result_index
         sf.run("part_select", index=final_index)
 
     part = doc.parts[final_index]
-    _reset_balloon()          # new mesh: the Balloon slider starts from zero
+    _reset_balloon()
     print("Ready: \"%s\" (%d triangles) - %s." % (
         part["name"], part["triangles"],
         "merged with the source" if merge else "new sculptable Part"))
     return final_index
 
-
-# ---------------------------------------------------------------------------
-# Interface (SculptForge 0.13.8+)
-# ---------------------------------------------------------------------------
 def _panel_value(control, fallback):
     """Value of a panel control, or the default value."""
     try:
@@ -256,13 +182,12 @@ def _panel_value(control, fallback):
         return fallback
     return fallback if value is None else value
 
-
 def _run_from_panel():
     try:
         thickness = float(_panel_value("thickness", THICKNESS * 100.0))
     except (TypeError, ValueError):
         thickness = THICKNESS * 100.0
-    if not (0.1 <= thickness <= 100.0):   # 0, NaN or denormal: unreadable value
+    if not (0.1 <= thickness <= 100.0):
         print("blobit: thickness read from the panel is invalid (%r), "
               "falling back to %.2f %%." % (thickness, THICKNESS * 100.0))
         thickness = THICKNESS * 100.0
@@ -280,18 +205,12 @@ def _run_from_panel():
         hide_source=bool(_panel_value("hide_source", HIDE_SOURCE)),
     )
 
-
-# Reshape: Balloon - buttons from -100 to 100 in steps of 20. The state keeps
-# the last applied setting: a button only applies the difference, so going
-# from +20 to +60 inflates by 40, and the 0 button returns to the start shape.
 BALLOON_STEPS = tuple(range(-100, 101, 20))
 _balloon_state = {"part": None, "amount": 0.0}
-
 
 def _reset_balloon():
     _balloon_state["part"] = None
     _balloon_state["amount"] = 0.0
-
 
 def _balloon_apply(value):
     """Apply the difference of the chosen Balloon setting to the active mesh.
@@ -323,11 +242,9 @@ def _balloon_apply(value):
     print("Reshape: Balloon %+d on \"%s\" (setting %+d)"
           % (delta, part["name"], amount))
 
-
 def _balloon_button(value):
     """Callback of a Balloon button (one function per value)."""
     return lambda: _balloon_apply(value)
-
 
 def _balloon_action_id(value):
     """Stable, unique action id: blobit.balloon.m20 / z0 / p20."""
@@ -337,7 +254,6 @@ def _balloon_action_id(value):
         return "blobit.balloon.p%d" % value
     return "blobit.balloon.z0"
 
-
 def _declare_ui():
     sf.ui.action(
         "blobit.run", "Blob it", _run_from_panel, icon="wand",
@@ -346,9 +262,7 @@ def _declare_ui():
     panel = sf.ui.panel("blobit", "blobit")
     panel.label("Mask an area of the active Part, then press Blob it")
     panel.separator()
-    # A slider label is a printf format - SculptForge appends " %.3g" for the
-    # value - so a literal "%" must be written "%%"; otherwise "% d" swallows
-    # the argument and the displayed number becomes garbage.
+
     panel.slider("thickness", "Shell thickness (%% of the longest side)",
                  THICKNESS * 100.0, 0.5, 10.0)
     panel.slider("smooth", "Edge smoothing", SMOOTH, 0, 30, integer=True)
@@ -363,8 +277,7 @@ def _declare_ui():
     panel.checkbox("merge", "Merge with the Part above", MERGE)
     panel.checkbox("hide_source", "Hide the source Part (otherwise its visibility is kept)",
                    HIDE_SOURCE)
-    # Symmetry after the first Quad Remesh; the slider value is reused for the
-    # second pass that cleans up the mirror cut. 0 turns both passes off.
+
     panel.checkbox("symmetric", "Make Symmetric after the quad remesh (X, through the origin)",
                    SYMMETRIC)
     panel.slider("qremesh", "Quad remesh (quads, 0 = off)",
@@ -384,7 +297,6 @@ def _declare_ui():
 
     sf.ui.place("blobit.run", "top")
     sf.ui.place("blobit", "my_panel")
-
 
 if hasattr(sf, "ui"):
     _declare_ui()

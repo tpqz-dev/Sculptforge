@@ -1,22 +1,18 @@
-# cube_button.py - ajoute un bouton "Create Cube" à l'interface (SculptForge 0.13.8+)
+# SPDX-FileCopyrightText: 2026 
+# SPDX-License-Identifier: CC0-1.0
 #
-# Script autonome : il ne dépend d'aucun autre fichier. Le dossier Scripts
-# n'est pas toujours sur sys.path (d'où l'erreur "No module named 'cube'"),
-# donc le maillage du cube est défini ici même.
-#
-# Lancement : File > Script > cube_button
-# Pour l'avoir à chaque démarrage : Edit > Preferences > Scripts >
-#   cocher cube_button sous "Run at start-up" (puis Trust this version).
-# Prérequis : Edit > Preferences > Scripts > Enable Python scripts.
+# Written in 2026. To the extent possible under law, the author(s) have dedicated 
+# all copyright and related and neighboring rights to this software to the public 
+# domain worldwide. This software is distributed without any warranty.
+# You should have received a copy of the CC0 Public Domain Dedication along with this software. 
+# If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
 
 import sculptforge as sf
 
-# --- Le cube : deux coins opposés, en unités de la scène ---------------------
 CUBE_MIN = (-0.5, -0.5, -0.5)
 CUBE_MAX = (0.5, 0.5, 0.5)
 PART_NAME = "cube"
 FLAT_SHADING = True
-
 
 def cube_mesh(corner_a, corner_b):
     """Sommets et 12 triangles d'un cube entre deux coins opposés.
@@ -30,33 +26,30 @@ def cube_mesh(corner_a, corner_b):
     x1, y1, z1 = hi
 
     vertices = [
-        (x0, y0, z0),  # 0
-        (x1, y0, z0),  # 1
-        (x1, y1, z0),  # 2
-        (x0, y1, z0),  # 3
-        (x0, y0, z1),  # 4
-        (x1, y0, z1),  # 5
-        (x1, y1, z1),  # 6
-        (x0, y1, z1),  # 7
+        (x0, y0, z0),
+        (x1, y0, z0),
+        (x1, y1, z0),
+        (x0, y1, z0),
+        (x0, y0, z1),
+        (x1, y0, z1),
+        (x1, y1, z1),
+        (x0, y1, z1),
     ]
 
-    # 12 triangles, normales vers l'extérieur (sens anti-horaire vu de dehors).
     triangles = [
-        (4, 5, 6), (4, 6, 7),   # +z
-        (1, 0, 3), (1, 3, 2),   # -z
-        (5, 1, 2), (5, 2, 6),   # +x
-        (0, 4, 7), (0, 7, 3),   # -x
-        (3, 7, 6), (3, 6, 2),   # +y
-        (0, 1, 5), (0, 5, 4),   # -y
+        (4, 5, 6), (4, 6, 7),
+        (1, 0, 3), (1, 3, 2),
+        (5, 1, 2), (5, 2, 6),
+        (0, 4, 7), (0, 7, 3),
+        (3, 7, 6), (3, 6, 2),
+        (0, 1, 5), (0, 5, 4),
     ]
     return vertices, triangles
-
 
 def create_cube():
     """Crée un cube entre CUBE_MIN et CUBE_MAX (une seule étape d'annulation)."""
     vertices, triangles = cube_mesh(CUBE_MIN, CUBE_MAX)
 
-    # Nouveau Part : le maillage en cours n'est pas remplacé.
     sf.run("part_append", type="cube", name=PART_NAME)
 
     doc = sf.document()
@@ -67,17 +60,13 @@ def create_cube():
     part = doc.parts[doc.active_part]
     print("Cube", part["name"], ":", part["triangles"], "triangles")
 
-
-# L'action : bouton, palette de commandes (F3), étagère, My Panel, raccourci.
 sf.ui.action("cube.create", "Create Cube", create_cube, icon="box",
              help="Crée un cube simple de 12 triangles")
 
-# Un petit panneau sous File > Script, avec le bouton dedans.
 panel = sf.ui.panel("cube", "Cube")
 panel.label("Cube simple, 12 triangles")
 panel.button("cube.create")
 
-# Emplacements visibles : l'étagère du haut et My Panel.
 sf.ui.place("cube.create", "top")
 sf.ui.place("cube", "my_panel")
 

@@ -1,35 +1,20 @@
-# decimate.py - expose the SculptForge "decimate" command as a panel
-# (SculptForge 0.13.8+).
+# SPDX-FileCopyrightText: 2026 
+# SPDX-License-Identifier: CC0-1.0
 #
-# Decimate reduces the triangle count of the active Part while preserving its
-# shape (quadric edge collapse; sculpt layers are kept). Three parameters:
-#   - ratio       fraction of triangles to keep (0.01-1);
-#   - triangles   exact target count, which overrides the ratio;
-#   - keep_masked masked vertices are not moved or removed.
-#
-# The panel gives a slider to each of them, a Decimate button, and a few quick
-# ratio buttons. The sliders are read when a button is pressed, so every button
-# uses the values shown in the panel.
-#
-# Launch: File > Script > decimate, then the "Decimate" button (top shelf,
-# My Panel, F3 palette). Requirement: Enable Python scripts in Preferences.
-# Each decimate is its own undo step (Ctrl+Z).
+# Written in 2026. To the extent possible under law, the author(s) have dedicated 
+# all copyright and related and neighboring rights to this software to the public 
+# domain worldwide. This software is distributed without any warranty.
+# You should have received a copy of the CC0 Public Domain Dedication along with this software. 
+# If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
 
 import sculptforge as sf
 
-# ---------------------------------------------------------------------------
-# Defaults (the panel replaces them when the button is clicked)
-# ---------------------------------------------------------------------------
-RATIO = 50            # percent of triangles kept (1-100)
-TARGET = 0            # exact count, in thousands of triangles (0 = use the ratio)
-KEEP_MASKED = False   # leave masked areas untouched
+RATIO = 50
+TARGET = 0
+KEEP_MASKED = False
 
-PRESETS = (90, 75, 50, 25, 10)   # quick percentage buttons
+PRESETS = (90, 75, 50, 25, 10)
 
-
-# ---------------------------------------------------------------------------
-# The command
-# ---------------------------------------------------------------------------
 def _panel_value(control, fallback):
     """Value of a panel control, or the default value."""
     try:
@@ -37,7 +22,6 @@ def _panel_value(control, fallback):
     except Exception:
         return fallback
     return fallback if value is None else value
-
 
 def decimate_part(ratio=RATIO, target=TARGET, keep_masked=KEEP_MASKED):
     """Decimate the active Part.
@@ -82,7 +66,6 @@ def decimate_part(ratio=RATIO, target=TARGET, keep_masked=KEEP_MASKED):
           % (before, after, ("%.1f" % (100.0 * after / before)) if before else "-"))
     return after
 
-
 def _run_from_panel():
     try:
         ratio = int(_panel_value("ratio", RATIO))
@@ -92,14 +75,13 @@ def _run_from_panel():
         target = int(_panel_value("target", TARGET))
     except (TypeError, ValueError):
         target = TARGET
-    if ratio <= 0:                       # unreadable slider: back to the default
+    if ratio <= 0:
         ratio = RATIO
     decimate_part(
         ratio=ratio,
         target=max(0, target),
         keep_masked=bool(_panel_value("keep_masked", KEEP_MASKED)),
     )
-
 
 def _preset_button(percent):
     """Callback of a quick-ratio button (ratio only, no exact count)."""
@@ -108,10 +90,6 @@ def _preset_button(percent):
         target=0,
         keep_masked=bool(_panel_value("keep_masked", KEEP_MASKED)))
 
-
-# ---------------------------------------------------------------------------
-# Interface (SculptForge 0.13.8+)
-# ---------------------------------------------------------------------------
 def _declare_ui():
     sf.ui.action(
         "decimate.run", "Decimate", _run_from_panel, icon="wand",
@@ -121,8 +99,7 @@ def _declare_ui():
     panel = sf.ui.panel("decimate", "Decimate")
     panel.label("Reduce the triangles of the active Part; the shape is kept")
     panel.separator()
-    # A slider label is a printf format - SculptForge appends " %.3g" for the
-    # value - so a literal "%" must be written "%%".
+
     panel.slider("ratio", "Keep (%% of triangles)", RATIO, 1, 100, integer=True)
     panel.slider("target", "Exact count (thousands of triangles, 0 = use the percentage)",
                  TARGET, 0, 2000, integer=True)
@@ -141,7 +118,6 @@ def _declare_ui():
 
     sf.ui.place("decimate.run", "top")
     sf.ui.place("decimate", "my_panel")
-
 
 if hasattr(sf, "ui"):
     _declare_ui()

@@ -1,7 +1,15 @@
+# SPDX-FileCopyrightText: 2026 
+# SPDX-License-Identifier: CC0-1.0
+#
+# Written in 2026. To the extent possible under law, the author(s) have dedicated 
+# all copyright and related and neighboring rights to this software to the public 
+# domain worldwide. This software is distributed without any warranty.
+# You should have received a copy of the CC0 Public Domain Dedication along with this software. 
+# If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
 
-CUBE_MIN = (-0.5, -0.5, -0.5)   
-CUBE_MAX = (0.5, 0.5, 0.5)      
-NAME = "cube"                  
+CUBE_MIN = (-0.5, -0.5, -0.5)
+CUBE_MAX = (0.5, 0.5, 0.5)
+NAME = "cube"
 
 def cube_mesh(corner_a, corner_b):
     lo = [min(a, b) for a, b in zip(corner_a, corner_b)]
@@ -10,35 +18,34 @@ def cube_mesh(corner_a, corner_b):
     x1, y1, z1 = hi
 
     vertices = [
-        (x0, y0, z0),  # 0
-        (x1, y0, z0),  # 1
-        (x1, y1, z0),  # 2
-        (x0, y1, z0),  # 3
-        (x0, y0, z1),  # 4
-        (x1, y0, z1),  # 5
-        (x1, y1, z1),  # 6
-        (x0, y1, z1),  # 7
+        (x0, y0, z0),
+        (x1, y0, z0),
+        (x1, y1, z0),
+        (x0, y1, z0),
+        (x0, y0, z1),
+        (x1, y0, z1),
+        (x1, y1, z1),
+        (x0, y1, z1),
     ]
 
     triangles = [
-        (4, 5, 6), (4, 6, 7),   # +z
-        (1, 0, 3), (1, 3, 2),   # -z
-        (5, 1, 2), (5, 2, 6),   # +x
-        (0, 4, 7), (0, 7, 3),   # -x
-        (3, 7, 6), (3, 6, 2),   # +y
-        (0, 1, 5), (0, 5, 4),   # -y
+        (4, 5, 6), (4, 6, 7),
+        (1, 0, 3), (1, 3, 2),
+        (5, 1, 2), (5, 2, 6),
+        (0, 4, 7), (0, 7, 3),
+        (3, 7, 6), (3, 6, 2),
+        (0, 1, 5), (0, 5, 4),
     ]
     return vertices, triangles
 def main():
     import sculptforge as sf
     doc = sf.document()
     sizes = [abs(b - a) for a, b in zip(CUBE_MIN, CUBE_MAX)]
-   
+
     vertices, triangles = cube_mesh(CUBE_MIN, CUBE_MAX)
     sf.run("part_append", type="cube", name=NAME)
     doc.set_mesh(vertices, triangles)
     part = doc.parts[doc.active_part]
-   
-    
+
 if __name__ == "__main__":
     main()

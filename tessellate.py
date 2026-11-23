@@ -1,37 +1,22 @@
-# tessellate.py - tessellate the whole mesh (SculptForge 0.13.8+).
+# SPDX-FileCopyrightText: 2026 
+# SPDX-License-Identifier: CC0-1.0
 #
-# SculptForge has no "Tessellate" command: the equivalent is "subdivide", a
-# Loop subdivision applied to every triangle of the active Part. Each level
-# multiplies the triangle count by 4 and keeps the shape (it only rounds it
-# very slightly); unlike Divide (subdiv_divide) it keeps no lower levels to
-# step back to. Past 4 levels, use "micro_divide" instead (Micro: the surface
-# is stored as displacements, so hundreds of millions of triangles stay
-# sculptable).
-#
-# The panel gives a slider to the number of levels and a slider to a target
-# triangle count, a Tessellate button, and four quick-level buttons.
-#
-# Launch: File > Script > tessellate, then the "Tessellate" button (top shelf,
-# My Panel, F3 palette). Requirement: Enable Python scripts in Preferences.
-# Each tessellation is its own undo step (Ctrl+Z).
+# Written in 2026. To the extent possible under law, the author(s) have dedicated 
+# all copyright and related and neighboring rights to this software to the public 
+# domain worldwide. This software is distributed without any warranty.
+# You should have received a copy of the CC0 Public Domain Dedication along with this software. 
+# If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
 
 import math
 
 import sculptforge as sf
 
-# ---------------------------------------------------------------------------
-# Defaults (the panel replaces them when the button is clicked)
-# ---------------------------------------------------------------------------
-LEVELS = 1        # subdivision levels (1-4): x4 triangles per level
-TARGET = 0        # target count, in thousands of triangles (0 = use the levels)
-MAX_LEVELS = 4    # subdivide stops at 4; beyond that use micro_divide
+LEVELS = 1
+TARGET = 0
+MAX_LEVELS = 4
 
 QUICK_LEVELS = (1, 2, 3, 4)
 
-
-# ---------------------------------------------------------------------------
-# The command
-# ---------------------------------------------------------------------------
 def _panel_value(control, fallback):
     """Value of a panel control, or the default value."""
     try:
@@ -39,7 +24,6 @@ def _panel_value(control, fallback):
     except Exception:
         return fallback
     return fallback if value is None else value
-
 
 def tessellate(levels=LEVELS, target=TARGET):
     """Tessellate the active Part: add polygons over the whole mesh.
@@ -88,7 +72,6 @@ def tessellate(levels=LEVELS, target=TARGET):
               "Micro (micro_divide) for more." % MAX_LEVELS)
     return after
 
-
 def _run_from_panel():
     try:
         levels = int(_panel_value("levels", LEVELS))
@@ -100,15 +83,10 @@ def _run_from_panel():
         target = TARGET
     tessellate(levels=levels, target=max(0, target))
 
-
 def _quick_button(count):
     """Callback of a quick-level button (levels only, no target)."""
     return lambda: tessellate(levels=count, target=0)
 
-
-# ---------------------------------------------------------------------------
-# Interface (SculptForge 0.13.8+)
-# ---------------------------------------------------------------------------
 def _declare_ui():
     sf.ui.action(
         "tessellate.run", "Tessellate", _run_from_panel, icon="wand",
@@ -136,7 +114,6 @@ def _declare_ui():
 
     sf.ui.place("tessellate.run", "top")
     sf.ui.place("tessellate", "my_panel")
-
 
 if hasattr(sf, "ui"):
     _declare_ui()
