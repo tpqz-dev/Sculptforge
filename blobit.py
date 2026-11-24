@@ -189,7 +189,7 @@ def _run_from_panel():
     except (TypeError, ValueError):
         thickness = THICKNESS * 100.0
     if not (0.1 <= thickness <= 100.0):
-        print("BlobIt 2: thickness read from the panel is invalid (%r), "
+        print("BlobIt : thickness read from the panel is invalid (%r), "
               "falling back to %.2f %%." % (thickness, THICKNESS * 100.0))
         thickness = THICKNESS * 100.0
     blob_it2(
@@ -245,7 +245,7 @@ def _declare_ui():
         help="Turn the masked area into a sculptable mesh, with decimation "
              "instead of voxel remesh (merging cannot be undone)")
 
-    panel = sf.ui.panel("blobit", "BlobIt 2")
+    panel = sf.ui.panel("blobit", "BlobIt ")
     panel.label("Mask an area of the active Part, then press Blob it 2")
     panel.separator()
 
@@ -287,8 +287,8 @@ def _declare_ui():
 
 if hasattr(sf, "ui"):
     _declare_ui()
-    print("BlobIt 2: \"Blob it 2\" button added (top shelf, "
+    print("BlobIt : \"Blob it 2\" button added (top shelf, "
           "My Panel, F3 palette).")
 else:
-    print("BlobIt 2: sf.ui missing (SculptForge 0.13.8+ required); "
+    print("BlobIt : sf.ui missing (SculptForge 0.13.8+ required); "
           "call blob_it2() from the Python console.")
