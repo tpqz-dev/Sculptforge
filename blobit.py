@@ -241,12 +241,12 @@ def _balloon_action_id(value):
 
 def _declare_ui():
     sf.ui.action(
-        "blobit.run", "Blob it 2", _run_from_panel, icon="wand",
+        "blobit.run", "Blob it ", _run_from_panel, icon="wand",
         help="Turn the masked area into a sculptable mesh, with decimation "
              "instead of voxel remesh (merging cannot be undone)")
 
     panel = sf.ui.panel("blobit", "BlobIt ")
-    panel.label("Mask an area of the active Part, then press Blob it 2")
+    panel.label("Mask an area of the active Part, then press Blob it ")
     panel.separator()
 
     panel.slider("thickness", "Shell thickness (%% of the longest side)",
@@ -291,4 +291,4 @@ if hasattr(sf, "ui"):
           "My Panel, F3 palette).")
 else:
     print("BlobIt : sf.ui missing (SculptForge 0.13.8+ required); "
-          "call blob_it2() from the Python console.")
+          "call blob_it() from the Python console.")
