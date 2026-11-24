@@ -15,10 +15,9 @@ PART_NAME = "cube"
 FLAT_SHADING = True
 
 def cube_mesh(corner_a, corner_b):
-    """Sommets et 12 triangles d'un cube entre deux coins opposés.
+    """Vertices and 12 triangles of a cube between two opposite corners.
 
-    Les coins peuvent être donnés dans n'importe quel ordre : les bornes sont
-    remises dans l'ordre axe par axe.
+    Corners can be given in any order: bounds are reordered axis by axis.
     """
     lo = [min(a, b) for a, b in zip(corner_a, corner_b)]
     hi = [max(a, b) for a, b in zip(corner_a, corner_b)]
@@ -47,7 +46,7 @@ def cube_mesh(corner_a, corner_b):
     return vertices, triangles
 
 def create_cube():
-    """Crée un cube entre CUBE_MIN et CUBE_MAX (une seule étape d'annulation)."""
+    """Creates a cube between CUBE_MIN and CUBE_MAX (single undo step)."""
     vertices, triangles = cube_mesh(CUBE_MIN, CUBE_MAX)
 
     sf.run("part_append", type="cube", name=PART_NAME)
@@ -61,13 +60,13 @@ def create_cube():
     print("Cube", part["name"], ":", part["triangles"], "triangles")
 
 sf.ui.action("cube.create", "Create Cube", create_cube, icon="box",
-             help="Crée un cube simple de 12 triangles")
+             help="Creates a simple cube with 12 triangles")
 
 panel = sf.ui.panel("cube", "Cube")
-panel.label("Cube simple, 12 triangles")
+panel.label("Simple cube, 12 triangles")
 panel.button("cube.create")
 
 sf.ui.place("cube.create", "top")
 sf.ui.place("cube", "my_panel")
 
-print("Bouton Create Cube ajouté : étagère du haut, My Panel, palette F3.")
+print("Create Cube button added: top shelf, My Panel, F3 palette.")

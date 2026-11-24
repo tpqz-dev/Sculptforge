@@ -287,7 +287,7 @@ def _declare_ui():
 
 if hasattr(sf, "ui"):
     _declare_ui()
-    print("BlobIt : \"Blob it 2\" button added (top shelf, "
+    print("BlobIt : \"Blob it \" button added (top shelf, "
           "My Panel, F3 palette).")
 else:
     print("BlobIt : sf.ui missing (SculptForge 0.13.8+ required); "
