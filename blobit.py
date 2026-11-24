@@ -13,13 +13,11 @@ THICKNESS = 0.0766
 SMOOTH = 24
 BOTH_SIDES = True
 
-VOXEL = True
-VOXEL_RES = 53
+DECIMATE = 25
 POLISH = 10
 ROUND = 0
 
 CONTRAST = 100
-FINAL_VOXEL = 32
 SYMMETRIC = True
 SYMMETRY_AXIS = "x"
 SYMMETRY_AXES = ("x", "y", "z", "xy", "xz", "yz")
@@ -30,7 +28,7 @@ MERGE = False
 HIDE_SOURCE = False
 FREEZE_LEVELS = True
 
-RESULT_SUFFIX = "_SB"
+RESULT_SUFFIX = "_SB2"
 
 def _mask_stats(mask):
     """(masked vertices, total), with or without NumPy."""
@@ -60,33 +58,34 @@ def _quad_remesh(quads, group, stage):
         print("  Quad remesh (%s) left out; the mesh keeps its current topology."
               % stage)
 
-def blob_it(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
-                 voxel=VOXEL, resolution=VOXEL_RES, polish=POLISH,
-                 round_form=ROUND, contrast=CONTRAST,
-                 final_voxel=FINAL_VOXEL, symmetric=SYMMETRIC,
-                 symmetry_axis=SYMMETRY_AXIS, quadremesh=QUADREMESH,
-                 group=GROUP, merge=MERGE, hide_source=HIDE_SOURCE,
-                 freeze_levels=FREEZE_LEVELS, name=""):
+def blob_it2(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
+             polish=POLISH, round_form=ROUND, contrast=CONTRAST,
+             decimate=DECIMATE, symmetric=SYMMETRIC,
+             symmetry_axis=SYMMETRY_AXIS, quadremesh=QUADREMESH,
+             group=GROUP, merge=MERGE, hide_source=HIDE_SOURCE,
+             freeze_levels=FREEZE_LEVELS, name=""):
     """Turn the masked area of the active Part into a sculptable mesh.
 
-    Steps: subdivision levels deleted, shell extracted from the mask,
-    optional voxel remesh, polish, rounding, Contrast pass, coarse voxel
-    remesh, face groups, Quad Remesh, then Make Symmetric and a second Quad
-    Remesh, then the source Part is hidden (or merged).
+    Steps: subdivision levels deleted, shell extracted from the mask, polish,
+    rounding, Contrast pass, decimation, face groups, Quad Remesh, then Make
+    Symmetric and a second Quad Remesh, then the source Part is hidden (or
+    merged).
+
+    `decimate` is the percentage of triangles kept (0-100, 0 = no decimation).
 
     Returns the index of the final Part, or None if nothing was done.
     """
     doc = sf.document()
     parts = doc.parts
     if not parts:
-        print("Blob it: the scene is empty, there is nothing to mask.")
+        print("Blob it 2: the scene is empty, there is nothing to mask.")
         return None
 
     masked, total = _mask_stats(doc.mask)
     if masked == 0:
-        print("Blob it: no mask on the active Part, nothing to extract.")
+        print("Blob it 2: no mask on the active Part, nothing to extract.")
         print("  Paint the mask (Mask brush, or Ctrl+click to invert it),")
-        print("  then press Blob it again.")
+        print("  then press Blob it 2 again.")
         return None
 
     source_index = doc.active_part
@@ -95,7 +94,7 @@ def blob_it(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
     target = name or (source_name + RESULT_SUFFIX)
     count_before = len(parts)
 
-    print("Blob it: \"%s\" - %d/%d vertices masked" % (source_name, masked, total))
+    print("Blob it 2: \"%s\" - %d/%d vertices masked" % (source_name, masked, total))
     print("  Thickness: %.2f %% of the longest side (%.4f)."
           % (float(thickness) * 100.0, float(thickness)))
 
@@ -109,12 +108,12 @@ def blob_it(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
                double=bool(both_sides),
                accept=True)
     except Exception as exc:
-        print("Blob it: extraction failed (%s)." % exc)
+        print("Blob it 2: extraction failed (%s)." % exc)
         print("  Check that the Part is visible and that the mask covers an area.")
         return None
 
     if len(doc.parts) != count_before + 1:
-        print("Blob it: the extraction created nothing "
+        print("Blob it 2: the extraction created nothing "
               "(masked area too small, or entirely hidden?).")
         return None
 
@@ -126,8 +125,6 @@ def blob_it(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
     sf.run("part_rename", to=target)
     sf.run("mask_clear")
 
-    if voxel:
-        sf.run("remesh", resolution=int(round(float(resolution))))
     if polish > 0:
         sf.run("deform_polish", amount=int(round(float(polish))), masked=False)
     if round_form > 0:
@@ -136,14 +133,19 @@ def blob_it(thickness=THICKNESS, smooth=SMOOTH, both_sides=BOTH_SIDES,
     if contrast:
         sf.run("deform_balloon", amount=int(round(float(contrast))), masked=False)
 
-    if final_voxel > 0:
-        sf.run("remesh", resolution=int(round(float(final_voxel))))
+    percent = float(decimate)
+    if percent > 0:
+        if percent >= 100.0:
+            print("  Decimate: %.0f %% keeps every triangle, skipped." % percent)
+        else:
+            _try("decimate", ratio=max(0.01, min(1.0, percent / 100.0)))
 
     if group:
         _try("facegroup_by_connectivity")
 
     quads = int(round(float(quadremesh)))
     _quad_remesh(quads, group, "first pass")
+    _balloon_apply(40)
 
     if symmetric:
         axis = symmetry_axis if symmetry_axis in SYMMETRY_AXES else "x"
@@ -187,17 +189,16 @@ def _run_from_panel():
     except (TypeError, ValueError):
         thickness = THICKNESS * 100.0
     if not (0.1 <= thickness <= 100.0):
-        print("BlobIt: thickness read from the panel is invalid (%r), "
+        print("BlobIt 2: thickness read from the panel is invalid (%r), "
               "falling back to %.2f %%." % (thickness, THICKNESS * 100.0))
         thickness = THICKNESS * 100.0
-    blob_it(
+    blob_it2(
         thickness=thickness / 100.0,
         smooth=int(_panel_value("smooth", SMOOTH)),
         both_sides=bool(_panel_value("both_sides", BOTH_SIDES)),
-        voxel=bool(_panel_value("voxel", VOXEL)),
-        resolution=int(_panel_value("resolution", VOXEL_RES)),
         polish=int(_panel_value("polish", POLISH)),
         round_form=int(_panel_value("round", ROUND)),
+        decimate=int(_panel_value("decimate", DECIMATE)),
         symmetric=bool(_panel_value("symmetric", SYMMETRIC)),
         quadremesh=int(_panel_value("qremesh", QUADREMESH)),
         merge=bool(_panel_value("merge", MERGE)),
@@ -240,11 +241,12 @@ def _balloon_action_id(value):
 
 def _declare_ui():
     sf.ui.action(
-        "blobit.run", "Blob it", _run_from_panel, icon="wand",
-        help="Turn the masked area into a sculptable mesh (merging cannot be undone)")
+        "blobit.run", "Blob it 2", _run_from_panel, icon="wand",
+        help="Turn the masked area into a sculptable mesh, with decimation "
+             "instead of voxel remesh (merging cannot be undone)")
 
-    panel = sf.ui.panel("blobit", "BlobIt")
-    panel.label("Mask an area of the active Part, then press Blob it")
+    panel = sf.ui.panel("blobit", "BlobIt 2")
+    panel.label("Mask an area of the active Part, then press Blob it 2")
     panel.separator()
 
     panel.slider("thickness", "Shell thickness (%% of the longest side)",
@@ -252,8 +254,9 @@ def _declare_ui():
     panel.slider("smooth", "Edge smoothing", SMOOTH, 0, 30, integer=True)
     panel.checkbox("both_sides", "Shell on both sides", BOTH_SIDES)
     panel.separator()
-    panel.checkbox("voxel", "Voxel remesh (Blob / Dynamesh)", VOXEL)
-    panel.slider("resolution", "Voxel resolution", VOXEL_RES, 32, 512, integer=True)
+
+    panel.slider("decimate", "Decimate (%% of triangles kept, 0 = off)",
+                 DECIMATE, 0, 100, integer=True)
     panel.slider("polish", "Polish", POLISH, 0, 100, integer=True)
     panel.slider("round", "Round at extraction (Contrast -100)", ROUND, 0, 100,
                  integer=True)
@@ -284,8 +287,8 @@ def _declare_ui():
 
 if hasattr(sf, "ui"):
     _declare_ui()
-    print("BlobIt: \"Blob it\" button added (top shelf, "
+    print("BlobIt 2: \"Blob it 2\" button added (top shelf, "
           "My Panel, F3 palette).")
 else:
-    print("BlobIt: sf.ui missing (SculptForge 0.13.8+ required); "
-          "call blob_it() from the Python console.")
+    print("BlobIt 2: sf.ui missing (SculptForge 0.13.8+ required); "
+          "call blob_it2() from the Python console.")
