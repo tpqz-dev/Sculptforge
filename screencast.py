@@ -25,6 +25,7 @@ FRAMERATE = 30
 _process = None
 _lock = threading.Lock()
 _output_dir = os.path.join(os.path.expanduser("~"), "Desktop")
+_log_path = None
 
 
 def _ffmpeg_available():
@@ -62,7 +63,7 @@ def _capture_region():
     """ffmpeg arguments that capture only the SculptForge window."""
     region = _window_rect()
     if region is None:
-        # Fall back to the whole desktop.
+        print("Screen cast: could not read the window position, recording the whole desktop.")
         return ["-f", "gdigrab", "-framerate", str(FRAMERATE), "-i", "desktop"]
     left, top, w, h = region
     # yuv420p needs even dimensions.
@@ -124,7 +125,7 @@ def _set_output_dir(path):
 
 
 def _start_recording():
-    global _process
+    global _process, _log_path
     with _lock:
         if _process is not None and _process.poll() is None:
             print("Screen cast: already recording, press Stop first.")
@@ -137,29 +138,40 @@ def _start_recording():
         os.makedirs(_output_dir, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = os.path.join(_output_dir, "sculptforge_%s.mp4" % stamp)
+        _log_path = os.path.join(_output_dir, "sculptforge_ffmpeg.log")
+        log_file = open(_log_path, "w")
         cmd = ["ffmpeg", "-y"] + _capture_region() + [
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
             "-pix_fmt", "yuv420p", path,
         ]
+        print("Screen cast: starting ffmpeg")
+        print("  " + " ".join(cmd))
         try:
             _process = subprocess.Popen(
-                cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL)
+                cmd, stdin=subprocess.PIPE, stdout=log_file,
+                stderr=subprocess.STDOUT)
         except Exception as exc:
             _process = None
+            log_file.close()
             print("Screen cast: could not start ffmpeg (%s)." % exc)
             return
-        print("Screen cast: recording the SculptForge window to %s" % path)
+        _process._log_file = log_file
+        print("Screen cast: recording to %s" % path)
         print("  Keep the window in place; press 'Stop recording' to save.")
 
 
 def _stop_recording():
-    global _process
+    global _process, _log_path
     with _lock:
         proc = _process
         _process = None
     if proc is None or proc.poll() is not None:
-        print("Screen cast: nothing is recording.")
+        # Already finished (or never started).
+        if proc is not None:
+            print("Screen cast: ffmpeg already exited (code %s)." % proc.returncode)
+            _print_log_tail()
+        else:
+            print("Screen cast: nothing is recording.")
         return
     try:
         proc.stdin.write(b"q")
@@ -171,7 +183,40 @@ def _stop_recording():
     except subprocess.TimeoutExpired:
         proc.terminate()
         proc.wait()
-    print("Screen cast: saved.")
+    log_file = getattr(proc, "_log_file", None)
+    if log_file is not None:
+        try:
+            log_file.close()
+        except Exception:
+            pass
+    # Find the output file: it is the last argument of the command.
+    out_path = proc.args[-1] if isinstance(proc.args, list) else None
+    if out_path and os.path.exists(out_path):
+        size = os.path.getsize(out_path)
+        if size > 0:
+            print("Screen cast: saved %s (%d bytes)." % (out_path, size))
+        else:
+            print("Screen cast: file is empty (%s)." % out_path)
+            _print_log_tail()
+    else:
+        print("Screen cast: output file not found.")
+        _print_log_tail()
+
+
+def _print_log_tail():
+    global _log_path
+    if not _log_path or not os.path.exists(_log_path):
+        return
+    try:
+        with open(_log_path) as f:
+            lines = f.readlines()
+        tail = lines[-12:]
+        if tail:
+            print("  ffmpeg log (last lines):")
+            for line in tail:
+                print("    " + line.rstrip())
+    except Exception:
+        pass
 
 
 def _open_folder():
