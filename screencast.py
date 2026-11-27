@@ -325,19 +325,19 @@ def _declare_ui():
                  help="Start recording the SculptForge window")
     sf.ui.action("screencast.stop", "Stop", _stop_recording, icon="scissors",
                  help="Stop recording and save the video")
-    sf.ui.action("screencast.folder", "Folder", _open_folder, icon="download",
+    sf.ui.action("screencast.folder", "Go to Folder", _open_folder, icon="download",
                  help="Open the folder where videos are saved")
-    sf.ui.action("screencast.choose", "Choose", _choose_folder, icon="box",
+    sf.ui.action("screencast.choose", "Choose save folder", _choose_folder, icon="box",
                  help="Choose the folder where videos are saved")
 
     panel = sf.ui.panel("screencast", "Screen cast")
     panel.label("Record the SculptForge window")
     panel.label("Output folder: %s" % _output_dir)
     panel.separator()
-    panel.button("screencast.record", label="Record")
-    panel.button("screencast.stop", label="Stop")
     panel.button("screencast.choose", label="Choose folder")
     panel.button("screencast.folder", label="Open folder")
+    panel.button("screencast.record", label="Record")
+    panel.button("screencast.stop", label="Stop")
     panel.separator()
     panel.label("Keep the window visible while recording.")
 

@@ -87,7 +87,7 @@ def _monitor_for_window():
     cx, cy = left + w // 2, top + h // 2
     try:
         import mss
-        with mss.mss() as sct:
+        with mss.MSS() as sct:
             for idx in range(1, len(sct.monitors)):
                 m = sct.monitors[idx]
                 if (m["left"] <= cx < m["left"] + m["width"] and
@@ -122,7 +122,7 @@ class _Recorder(_BaseRecorder if _BaseRecorder is not None else object):
                 "Unsupported file format: %s. Supported: %s"
                 % (file_extension, valid_formats))
 
-        with mss.mss() as sct:
+        with mss.MSS() as sct:
             monitors = sct.monitors
             if self.monitor_number < 0 or self.monitor_number >= len(monitors):
                 raise ValueError(
@@ -149,7 +149,7 @@ class _Recorder(_BaseRecorder if _BaseRecorder is not None else object):
         frame_interval = 1.0 / self.fps
         next_time = start_time
 
-        with mss.mss() as sct:
+        with mss.MSS() as sct:
             while not self._stop.is_set():
                 now = time.time()
                 if next_time > now:
@@ -300,19 +300,20 @@ def _declare_ui():
                  help="Start recording with pyscreenrecorder")
     sf.ui.action("pyscreencaster.stop", "Stop", _stop_recording, icon="scissors",
                  help="Stop recording and save the video")
-    sf.ui.action("pyscreencaster.folder", "Folder", _open_folder, icon="download",
+    sf.ui.action("pyscreencaster.folder", "Go to save Folder", _open_folder, icon="download",
                  help="Open the folder where videos are saved")
-    sf.ui.action("pyscreencaster.choose", "Choose", _choose_folder, icon="box",
+    sf.ui.action("pyscreencaster.choose", "Choose save folder", _choose_folder, icon="box",
                  help="Choose the folder where videos are saved")
 
     panel = sf.ui.panel("pyscreencaster", "Py screen cast")
     panel.label("Record with pyscreenrecorder (mss)")
     panel.label("Output folder: %s" % _output_dir)
     panel.separator()
-    panel.button("pyscreencaster.record", label="Record")
-    panel.button("pyscreencaster.stop", label="Stop")
     panel.button("pyscreencaster.choose", label="Choose folder")
     panel.button("pyscreencaster.folder", label="Open folder")
+    panel.separator()
+    panel.button("pyscreencaster.record", label="Record")
+    panel.button("pyscreencaster.stop", label="Stop")
     panel.separator()
     panel.label("Edit FRAMERATE at the top of the script.")
 
