@@ -10,6 +10,7 @@
 import sculptforge as sf
 
 SOLIDIFY = 0.151
+DECIMATE = 25
 QUADREMESH = 2000
 BALLOON = 80
 SMOOTH = 30
@@ -42,6 +43,19 @@ def _try(command, **params):
         return False
 
 
+def _decimate(percent, stage):
+    """Decimate to this percentage of triangles kept (skipped when 0)."""
+    value = float(percent)
+    if value <= 0.0:
+        return
+    if value >= 100.0:
+        print("  Decimate (%s): %.0f %% keeps every triangle, skipped."
+              % (stage, value))
+        return
+    if not _try("decimate", ratio=max(0.01, min(1.0, value / 100.0))):
+        print("  Decimate left out; the mesh keeps its triangle count.")
+
+
 def _quad_remesh(quads, group):
     """Run one Quad Remesh pass (skipped when quads is 0)."""
     target = int(round(float(quads)))
@@ -52,14 +66,15 @@ def _quad_remesh(quads, group):
         print("  Quad remesh left out; the mesh keeps its current topology.")
 
 
-def blob_it_02(thickness=SOLIDIFY, quadremesh=QUADREMESH, balloon=BALLOON,
-               keep_groups=KEEP_GROUPS, hide_source=HIDE_SOURCE, name=""):
+def blob_it_02(thickness=SOLIDIFY, decimate=DECIMATE, quadremesh=QUADREMESH,
+               balloon=BALLOON, keep_groups=KEEP_GROUPS,
+               hide_source=HIDE_SOURCE, name=""):
     """Turn the unmasked area of the active Part into a solid, sculptable mesh.
 
     The Part must be masked: the mask is copied with the duplicate, inverted,
     the masked part deleted (so only the unmasked area stays), the leftover
-    mask cleared, then the surface is solidified, quad remeshed and inflated
-    with Balloon.
+    mask cleared, then the surface is solidified, decimated, quad remeshed and
+    inflated with Balloon.
 
     `thickness` is Solidify's value: a fraction of the largest side (0.151 is
     15.1 %, negative grows in front of the surface, 0 leaves it single-sided).
@@ -93,6 +108,7 @@ def blob_it_02(thickness=SOLIDIFY, quadremesh=QUADREMESH, balloon=BALLOON,
           % (source_name, masked, total, total - masked))
     print("  Solidify: %.3f of the longest side (%.1f %%)."
           % (float(thickness), float(thickness) * 100.0))
+    print("  Decimate: %.0f %% of the triangles kept." % float(decimate))
 
     if not _try("part_duplicate"):
         print("Blob it 02: could not duplicate the Part.")
@@ -115,6 +131,8 @@ def blob_it_02(thickness=SOLIDIFY, quadremesh=QUADREMESH, balloon=BALLOON,
             print("  Solidify left out; the surface stays single-sided.")
     else:
         print("  Solidify: thickness 0, the surface stays single-sided.")
+
+    _decimate(decimate, "before the quad remesh")
 
     _quad_remesh(quadremesh, keep_groups)
 
@@ -152,6 +170,7 @@ def _run_from_panel():
         thickness = SOLIDIFY
     blob_it_02(
         thickness=thickness,
+        decimate=int(_panel_value("decimate", DECIMATE)),
         quadremesh=int(_panel_value("quadremesh", QUADREMESH)),
         keep_groups=bool(_panel_value("keep_groups", KEEP_GROUPS)),
         hide_source=bool(_panel_value("hide_source", HIDE_SOURCE)),
@@ -233,7 +252,7 @@ def _declare_ui():
         "blobit02.run", "Blob it 02", _run_from_panel, icon="wand",
         help="Build a solid Part from the unmasked area of a masked Part: "
              "duplicate, invert the mask, delete the masked part, solidify, "
-             "quad remesh, Balloon")
+             "decimate, quad remesh, Balloon")
     sf.ui.action(
         "blobit02.balloon.run", "Balloon !", _balloon_from_panel, icon="move",
         help="Apply the Balloon amount from the slider to the active Part")
@@ -250,6 +269,8 @@ def _declare_ui():
     panel.label("Solidify thickness: a fraction of the longest side "
                 "(0.151 = 15.1 %; 0 keeps the surface single-sided)")
     panel.slider("solidify", "Solidify thickness (of the side)", SOLIDIFY, -1.0, 1.0)
+    panel.slider("decimate", "Decimate (% kept, 0 = off)",
+                 DECIMATE, 0, 100, integer=True)
     panel.slider("quadremesh", "Quad remesh (quads, 0 = off)",
                  QUADREMESH, 0, 20000, integer=True)
     panel.checkbox("keep_groups", "Quad remesh follows Face Groups", KEEP_GROUPS)
