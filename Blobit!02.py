@@ -11,10 +11,13 @@ import sculptforge as sf
 
 SOLIDIFY = 0.151
 DECIMATE = 25
-QUADREMESH = 2000
+QUADREMESH = 400
 BALLOON = 80
 SMOOTH = 30
 SMOOTH_REPEAT = 1
+SYMMETRIC = True
+SYMMETRY_AXIS = "x"
+SYMMETRY_AXES = ("x", "y", "z", "xy", "xz", "yz")
 KEEP_GROUPS = True
 HIDE_SOURCE = False
 
@@ -67,14 +70,15 @@ def _quad_remesh(quads, group):
 
 
 def blob_it_02(thickness=SOLIDIFY, decimate=DECIMATE, quadremesh=QUADREMESH,
-               balloon=BALLOON, keep_groups=KEEP_GROUPS,
+               balloon=BALLOON, symmetric=SYMMETRIC,
+               symmetry_axis=SYMMETRY_AXIS, keep_groups=KEEP_GROUPS,
                hide_source=HIDE_SOURCE, name=""):
     """Turn the unmasked area of the active Part into a solid, sculptable mesh.
 
     The Part must be masked: the mask is copied with the duplicate, inverted,
     the masked part deleted (so only the unmasked area stays), the leftover
-    mask cleared, then the surface is solidified, decimated, quad remeshed and
-    inflated with Balloon.
+    mask cleared, then the surface is solidified, decimated, quad remeshed,
+    made symmetric (with a second quad remesh) and inflated with Balloon.
 
     `thickness` is Solidify's value: a fraction of the largest side (0.151 is
     15.1 %, negative grows in front of the surface, 0 leaves it single-sided).
@@ -136,6 +140,17 @@ def blob_it_02(thickness=SOLIDIFY, decimate=DECIMATE, quadremesh=QUADREMESH,
 
     _quad_remesh(quadremesh, keep_groups)
 
+    if symmetric:
+        axis = symmetry_axis if symmetry_axis in SYMMETRY_AXES else "x"
+        if axis != symmetry_axis:
+            print("  Make Symmetric: unknown axis %r, using x." % (symmetry_axis,))
+        if _try("mirror_and_weld", axis=axis):
+            print("  Make Symmetric: mirrored across the %s plane through the origin."
+                  % axis)
+            _quad_remesh(quadremesh, keep_groups)
+        else:
+            print("  Make Symmetric left out; the mesh keeps its own symmetry.")
+
     amount = int(round(float(balloon)))
     if amount != 0:
         _balloon_apply(amount)
@@ -172,6 +187,7 @@ def _run_from_panel():
         thickness=thickness,
         decimate=int(_panel_value("decimate", DECIMATE)),
         quadremesh=int(_panel_value("quadremesh", QUADREMESH)),
+        symmetric=bool(_panel_value("symmetric", SYMMETRIC)),
         keep_groups=bool(_panel_value("keep_groups", KEEP_GROUPS)),
         hide_source=bool(_panel_value("hide_source", HIDE_SOURCE)),
     )
@@ -274,6 +290,9 @@ def _declare_ui():
     panel.slider("quadremesh", "Quad remesh (quads, 0 = off)",
                  QUADREMESH, 0, 20000, integer=True)
     panel.checkbox("keep_groups", "Quad remesh follows Face Groups", KEEP_GROUPS)
+    panel.checkbox("symmetric",
+                   "Make Symmetric after the remesh (X)",
+                   SYMMETRIC)
     panel.separator()
 
     panel.checkbox("hide_source", "Hide the source Part", HIDE_SOURCE)
