@@ -16,6 +16,8 @@ QUADREMESH = 400
 BALLOON = 80
 SMOOTH = 30
 SMOOTH_REPEAT = 1
+RELAX = 30
+RELAX_REPEAT = 1
 SYMMETRIC = True
 SYMMETRY_AXIS = "x"
 SYMMETRY_AXES = ("x", "y", "z", "xy", "xz", "yz")
@@ -279,6 +281,34 @@ def _smooth_from_panel():
                   _panel_value("smooth_repeat", SMOOTH_REPEAT))
 
 
+def _relax_apply(amount, repeat):
+    """Relax the active Part `repeat` times with this amount (one undo step per pass)."""
+    doc = sf.document()
+    if not doc.parts:
+        return
+
+    part = doc.parts[doc.active_part]
+    strength = int(round(float(amount)))
+    times = int(round(float(repeat)))
+    if strength <= 0:
+        print("Reshape: Relax 0 on \"%s\": nothing to change." % part["name"])
+        return
+    if times <= 0:
+        print("Reshape: Relax repeat 0 on \"%s\": nothing to change." % part["name"])
+        return
+
+    sf.run("deform_relax", amount=strength)
+    for _ in range(times - 1):
+        sf.run("deform_relax", amount=strength)
+    print("Reshape: Relax %d x%d on \"%s\""
+          % (strength, times, part["name"]))
+
+
+def _relax_from_panel():
+    _relax_apply(_panel_value("relax", RELAX),
+                 _panel_value("relax_repeat", RELAX_REPEAT))
+
+
 def _declare_ui():
     sf.ui.action(
         "blobit02.run", "Blob it 02", _run_from_panel, icon="wand",
@@ -293,6 +323,11 @@ def _declare_ui():
         icon="sparkles",
         help="Smooth the active Part with the slider's amount, repeated as "
              "many times as the Repeat slider says")
+    sf.ui.action(
+        "blobit02.relax.run", "Execute relax", _relax_from_panel,
+        icon="brush",
+        help="Relax the vertex spacing of the active Part with the slider's "
+             "amount, repeated as many times as the Repeat slider says")
 
     panel = sf.ui.panel("blobit02", "Blob it 02")
     panel.label("Mask the area to keep, then press Blob it 02")
@@ -326,6 +361,12 @@ def _declare_ui():
     panel.slider("smooth_repeat", "Repeat (0 = off)", SMOOTH_REPEAT, 0, 10,
                  integer=True)
     panel.button("blobit02.smooth.run", label="Execute smooth")
+    panel.separator()
+    panel.slider("relax", "Relax amount (0-100)", RELAX, 0, 100,
+                 integer=True)
+    panel.slider("relax_repeat", "Repeat (0 = off)", RELAX_REPEAT, 0, 10,
+                 integer=True)
+    panel.button("blobit02.relax.run", label="Execute relax")
     # Balloon presets: commented out (the slider and "Balloon !" stay)
     # panel.separator()
     # panel.label("Presets: each applies its own value (0 does nothing)")
