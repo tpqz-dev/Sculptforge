@@ -301,26 +301,50 @@ def _set_server(value):
     print("Clip to Comfy: server set to %s" % SERVER)
 
 
-def _ask_server():
-    script = os.path.join(tempfile.gettempdir(), "sf_clip2comfy_server.vbs")
-    with open(script, "w", encoding="ascii") as output:
-        output.write('s = InputBox("ComfyUI server (host:port or http://host:port)", _\n')
-        output.write('              "Clip to Comfy", "%s")\n' % SERVER)
+def _input_box(message, title, initial):
+    """Ask for one line of text with the Windows InputBox dialog."""
+    script = os.path.join(tempfile.gettempdir(), "sf_clip2comfy_input.vbs")
+    parts = [str(part).replace('"', '""') for part in (message, title, initial)]
+    with open(script, "w", encoding="mbcs") as output:
+        output.write('s = InputBox("%s", "%s", "%s")\n' % tuple(parts))
         output.write("WScript.Echo s\n")
     try:
         result = subprocess.run(
             ["cscript", "//nologo", script], capture_output=True, text=True,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        return result.stdout.strip()
     except Exception as exc:
-        print("Clip to Comfy: input box unavailable (%s); edit HOST and PORT "
+        print("Clip to Comfy: input box unavailable (%s); edit the constants "
               "at the top of the script." % exc)
-        return
+        return None
     finally:
         try:
             os.remove(script)
         except OSError:
             pass
-    _set_server(result.stdout.strip())
+
+
+def _ask_server():
+    value = _input_box("ComfyUI server (host:port or http://host:port)",
+                       "Clip to Comfy", SERVER)
+    if value is not None:
+        _set_server(value)
+
+
+def _set_prompt(value):
+    global PROMPT
+    text = str(value).strip()
+    if not text:
+        print("Clip to Comfy: empty prompt ignored.")
+        return
+    PROMPT = text
+    print("Clip to Comfy: prompt set to %r" % PROMPT)
+
+
+def _ask_prompt():
+    value = _input_box("Prompt for the img2img pass", "Clip to Comfy", PROMPT)
+    if value is not None:
+        _set_prompt(value)
 
 
 def _panel_value(control, fallback):
@@ -483,6 +507,10 @@ def _declare_ui():
         help="Type the ComfyUI address (host:port or http://host:port). HOST and "
              "PORT can also be edited at the top of the script")
     sf.ui.action(
+        "clip2comfy.prompt", "Set prompt", _ask_prompt, icon="wand",
+        help="Type the prompt used by the img2img pass. PROMPT can also be "
+             "edited at the top of the script")
+    sf.ui.action(
         "clip2comfy.choose", "Choose folder", _choose_folder, icon="box",
         help="Choose where the generated images are saved")
     sf.ui.action(
@@ -491,7 +519,7 @@ def _declare_ui():
 
     panel = sf.ui.panel("clip2comfy", "Clip to Comfy")
     panel.label("Clipboard image -> ComfyUI img2img -> image viewer")
-    panel.label("Prompt: " + PROMPT)
+    panel.label("Prompt: " + PROMPT + " (click Set prompt to change)")
     panel.label("Server: " + SERVER + " (click Set server to change)")
     panel.separator()
     panel.label("Model settings")
@@ -507,6 +535,7 @@ def _declare_ui():
     panel.button("clip2comfy.last", label="Open last image")
     panel.button("clip2comfy.check", label="Check server")
     panel.button("clip2comfy.server", label="Set server")
+    panel.button("clip2comfy.prompt", label="Set prompt")
     panel.separator()
     panel.button("clip2comfy.choose", label="Choose folder")
     panel.button("clip2comfy.folder", label="Open folder")
