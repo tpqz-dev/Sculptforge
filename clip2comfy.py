@@ -28,6 +28,8 @@ NEGATIVE = ""
 STEPS = 20
 CFG = 7.0
 DENOISE = 0.5
+RANDOM_SEED = True
+SEED = 0
 SAMPLER = "euler"
 SCHEDULER = "normal"
 MAX_SIDE = 1024
@@ -210,7 +212,7 @@ def _first_checkpoint(url):
     return names[0]
 
 
-def _workflow(image_name, checkpoint, seed):
+def _workflow(image_name, checkpoint, seed, steps=STEPS, cfg=CFG, denoise=DENOISE):
     return {
         "1": {"class_type": "LoadImage", "inputs": {"image": image_name}},
         "2": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": checkpoint}},
@@ -220,9 +222,9 @@ def _workflow(image_name, checkpoint, seed):
               "inputs": {"text": NEGATIVE, "clip": ["2", 1]}},
         "5": {"class_type": "VAEEncode", "inputs": {"pixels": ["1", 0], "vae": ["2", 2]}},
         "6": {"class_type": "KSampler",
-              "inputs": {"seed": seed, "steps": STEPS, "cfg": CFG,
+              "inputs": {"seed": seed, "steps": steps, "cfg": cfg,
                          "sampler_name": SAMPLER, "scheduler": SCHEDULER,
-                         "denoise": DENOISE, "model": ["2", 0],
+                         "denoise": denoise, "model": ["2", 0],
                          "positive": ["3", 0], "negative": ["4", 0],
                          "latent_image": ["5", 0]}},
         "7": {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["2", 2]}},
@@ -273,7 +275,17 @@ def _open_viewer(path):
         print("Clip to Comfy: could not open the image viewer (%s)." % exc)
 
 
-def _run(url=SERVER, open_viewer=True):
+def _panel_value(control, fallback):
+    """Value of a panel control, or the default value."""
+    try:
+        value = sf.ui.value("clip2comfy." + control)
+    except Exception:
+        return fallback
+    return fallback if value is None else value
+
+
+def _run(url=SERVER, open_viewer=True, steps=STEPS, cfg=CFG, denoise=DENOISE,
+         seed=None, random_seed=RANDOM_SEED):
     global _last_image, _busy
     with _lock:
         if _busy:
@@ -281,6 +293,11 @@ def _run(url=SERVER, open_viewer=True):
             return None
         _busy = True
     try:
+        steps = max(1, min(200, int(steps)))
+        cfg = max(0.1, min(100.0, float(cfg)))
+        denoise = max(0.0, min(1.0, float(denoise)))
+        seed = abs(int(seed)) % (2 ** 31)
+
         print("Clip to Comfy: reading the clipboard...")
         image, width, height = _fit_rgb(*_clipboard_rgb())
         print("  image: %d x %d px" % (width, height))
@@ -290,8 +307,11 @@ def _run(url=SERVER, open_viewer=True):
         checkpoint = _first_checkpoint(url)
         print("  checkpoint: %s" % checkpoint)
 
-        seed = int.from_bytes(os.urandom(4), "big") % (2 ** 31)
-        workflow = _workflow(name, checkpoint, seed)
+        if seed is None or random_seed:
+            seed = int.from_bytes(os.urandom(4), "big") % (2 ** 31)
+        workflow = _workflow(name, checkpoint, seed, steps, cfg, denoise)
+        print("  steps=%d  cfg=%.1f  denoise=%.2f  seed=%d"
+              % (steps, cfg, denoise, seed))
         reply = _json_post(url + "/prompt",
                            {"prompt": workflow, "client_id": "sculptforge-" + uuid.uuid4().hex})
         prompt_id = reply.get("prompt_id")
@@ -316,8 +336,17 @@ def _run(url=SERVER, open_viewer=True):
 
 
 def _run_in_thread():
+    settings = (
+        int(_panel_value("steps", STEPS)),
+        float(_panel_value("cfg", CFG)),
+        float(_panel_value("denoise", DENOISE)),
+        int(_panel_value("seed", SEED)),
+        bool(_panel_value("random_seed", RANDOM_SEED)),
+    )
+
     def work():
-        _run()
+        _run(steps=settings[0], cfg=settings[1], denoise=settings[2],
+             seed=settings[3], random_seed=settings[4])
 
     with _lock:
         if _busy:
@@ -410,6 +439,15 @@ def _declare_ui():
     panel.label("Clipboard image -> ComfyUI img2img -> image viewer")
     panel.label("Prompt: " + PROMPT)
     panel.label("Server: " + SERVER)
+    panel.separator()
+    panel.label("Model settings")
+    panel.slider("steps", "Steps", STEPS, 1, 60, integer=True)
+    panel.slider("cfg", "CFG scale", CFG, 1.0, 20.0)
+    panel.slider("denoise", "Denoise (noise added)", DENOISE, 0.0, 1.0)
+    panel.checkbox("random_seed", "Random seed each run", RANDOM_SEED)
+    panel.slider("seed", "Fixed seed", SEED, 0, 2147483647, integer=True)
+    panel.label("Sampler: %s / Scheduler: %s (constants at the top)"
+                % (SAMPLER, SCHEDULER))
     panel.separator()
     panel.button("clip2comfy.run", label="Run in ComfyUI")
     panel.button("clip2comfy.last", label="Open last image")
