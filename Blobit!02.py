@@ -12,6 +12,8 @@ import sculptforge as sf
 SOLIDIFY = 0.151
 QUADREMESH = 2000
 BALLOON = 80
+SMOOTH = 30
+SMOOTH_REPEAT = 1
 KEEP_GROUPS = True
 HIDE_SOURCE = False
 
@@ -198,6 +200,34 @@ def _balloon_action_id(value):
     return "blobit02.balloon.z0"
 
 
+def _smooth_apply(amount, repeat):
+    """Smooth the active Part `repeat` times with this amount (one undo step per pass)."""
+    doc = sf.document()
+    if not doc.parts:
+        return
+
+    part = doc.parts[doc.active_part]
+    strength = int(round(float(amount)))
+    times = int(round(float(repeat)))
+    if strength <= 0:
+        print("Reshape: Smooth 0 on \"%s\": nothing to change." % part["name"])
+        return
+    if times <= 0:
+        print("Reshape: Smooth repeat 0 on \"%s\": nothing to change." % part["name"])
+        return
+
+    sf.run("deform_smooth", amount=strength)
+    for _ in range(times - 1):
+        sf.run("deform_smooth", amount=strength)
+    print("Reshape: Smooth %d x%d on \"%s\""
+          % (strength, times, part["name"]))
+
+
+def _smooth_from_panel():
+    _smooth_apply(_panel_value("smooth", SMOOTH),
+                  _panel_value("smooth_repeat", SMOOTH_REPEAT))
+
+
 def _declare_ui():
     sf.ui.action(
         "blobit02.run", "Blob it 02", _run_from_panel, icon="wand",
@@ -207,6 +237,11 @@ def _declare_ui():
     sf.ui.action(
         "blobit02.balloon.run", "Balloon !", _balloon_from_panel, icon="move",
         help="Apply the Balloon amount from the slider to the active Part")
+    sf.ui.action(
+        "blobit02.smooth.run", "Execute smooth", _smooth_from_panel,
+        icon="sparkles",
+        help="Smooth the active Part with the slider's amount, repeated as "
+             "many times as the Repeat slider says")
 
     panel = sf.ui.panel("blobit02", "Blob it 02")
     panel.label("Mask the area to keep, then press Blob it 02")
@@ -224,10 +259,16 @@ def _declare_ui():
     panel.button("blobit02.run")
     panel.separator()
 
-    panel.label("Balloon after the remesh")
+    panel.label("After the remesh")
     panel.slider("balloon", "Balloon amount (-100 to +100)", BALLOON, -100, 100,
                  integer=True)
     panel.button("blobit02.balloon.run", label="Balloon !")
+    panel.separator()
+    panel.slider("smooth", "Smooth amount (0-100)", SMOOTH, 0, 100,
+                 integer=True)
+    panel.slider("smooth_repeat", "Repeat (0 = off)", SMOOTH_REPEAT, 0, 10,
+                 integer=True)
+    panel.button("blobit02.smooth.run", label="Execute smooth")
     panel.separator()
     panel.label("Presets: each applies its own value (0 does nothing)")
     for value in BALLOON_STEPS:
