@@ -309,17 +309,19 @@ def _declare_ui():
     panel.slider("smooth_repeat", "Repeat (0 = off)", SMOOTH_REPEAT, 0, 10,
                  integer=True)
     panel.button("blobit02.smooth.run", label="Execute smooth")
-    panel.separator()
-    panel.label("Presets: each applies its own value (0 does nothing)")
-    for value in BALLOON_STEPS:
-        aid = _balloon_action_id(value)
-        label = "0" if value == 0 else ("%+d" % value)
-        sf.ui.action(aid, "Balloon " + label, _balloon_button(value),
-                     icon="move",
-                     help="Inflates (positive) or deflates (negative) the active "
-                          "Part by this percentage, applied as it is; pressing it "
-                          "again applies it again, and 0 changes nothing.")
-        panel.button(aid, label=label)
+    # Balloon presets: commented out (the slider and "Balloon !" stay)
+    # panel.separator()
+    # panel.label("Presets: each applies its own value (0 does nothing)")
+    # for value in BALLOON_STEPS:
+    #     aid = _balloon_action_id(value)
+    #     label = "0" if value == 0 else ("%+d" % value)
+    #     sf.ui.action(aid, "Balloon " + label, _balloon_button(value),
+    #                  icon="move",
+    #                  help="Inflates (positive) or deflates (negative) the "
+    #                       "active Part by this percentage, applied as it is; "
+    #                       "pressing it again applies it again, and 0 changes "
+    #                       "nothing.")
+    #     panel.button(aid, label=label)
 
     sf.ui.place("blobit02.run", "top")
     sf.ui.place("blobit02", "my_panel")
