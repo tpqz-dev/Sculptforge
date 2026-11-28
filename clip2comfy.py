@@ -11,6 +11,8 @@ import ctypes
 import json
 import os
 import struct
+import subprocess
+import tempfile
 import threading
 import time
 import urllib.error
@@ -22,7 +24,9 @@ from datetime import datetime
 
 import sculptforge as sf
 
-SERVER = "http://127.0.0.1:8188"
+HOST = "127.0.0.1"
+PORT = 8188
+SERVER = "http://%s:%d" % (HOST, PORT)
 PROMPT = "improve this render like a to 3d render from zbrush or blender"
 NEGATIVE = ""
 STEPS = 20
@@ -275,6 +279,50 @@ def _open_viewer(path):
         print("Clip to Comfy: could not open the image viewer (%s)." % exc)
 
 
+def _set_server(value):
+    """Accept 'host:port', 'http://host:port' or a full URL."""
+    global SERVER, HOST, PORT
+    text = str(value).strip()
+    if not text:
+        return
+    if "://" not in text:
+        text = "http://" + text
+    try:
+        parsed = urllib.parse.urlsplit(text)
+        host = parsed.hostname or ""
+        port = parsed.port
+    except ValueError:
+        host, port = "", None
+    if not host or port is None or not (1 <= port <= 65535):
+        print("Clip to Comfy: invalid server %r (expected host:port)." % value)
+        return
+    SERVER = "http://%s:%d" % (host, port)
+    HOST, PORT = host, port
+    print("Clip to Comfy: server set to %s" % SERVER)
+
+
+def _ask_server():
+    script = os.path.join(tempfile.gettempdir(), "sf_clip2comfy_server.vbs")
+    with open(script, "w", encoding="ascii") as output:
+        output.write('s = InputBox("ComfyUI server (host:port or http://host:port)", _\n')
+        output.write('              "Clip to Comfy", "%s")\n' % SERVER)
+        output.write("WScript.Echo s\n")
+    try:
+        result = subprocess.run(
+            ["cscript", "//nologo", script], capture_output=True, text=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception as exc:
+        print("Clip to Comfy: input box unavailable (%s); edit HOST and PORT "
+              "at the top of the script." % exc)
+        return
+    finally:
+        try:
+            os.remove(script)
+        except OSError:
+            pass
+    _set_server(result.stdout.strip())
+
+
 def _panel_value(control, fallback):
     """Value of a panel control, or the default value."""
     try:
@@ -284,9 +332,11 @@ def _panel_value(control, fallback):
     return fallback if value is None else value
 
 
-def _run(url=SERVER, open_viewer=True, steps=STEPS, cfg=CFG, denoise=DENOISE,
+def _run(url=None, open_viewer=True, steps=STEPS, cfg=CFG, denoise=DENOISE,
          seed=None, random_seed=RANDOM_SEED):
     global _last_image, _busy
+    if url is None:
+        url = SERVER
     with _lock:
         if _busy:
             print("Clip to Comfy: a conversion is already running.")
@@ -296,7 +346,6 @@ def _run(url=SERVER, open_viewer=True, steps=STEPS, cfg=CFG, denoise=DENOISE,
         steps = max(1, min(200, int(steps)))
         cfg = max(0.1, min(100.0, float(cfg)))
         denoise = max(0.0, min(1.0, float(denoise)))
-        seed = abs(int(seed)) % (2 ** 31)
 
         print("Clip to Comfy: reading the clipboard...")
         image, width, height = _fit_rgb(*_clipboard_rgb())
@@ -309,6 +358,7 @@ def _run(url=SERVER, open_viewer=True, steps=STEPS, cfg=CFG, denoise=DENOISE,
 
         if seed is None or random_seed:
             seed = int.from_bytes(os.urandom(4), "big") % (2 ** 31)
+        seed = abs(int(seed)) % (2 ** 31)
         workflow = _workflow(name, checkpoint, seed, steps, cfg, denoise)
         print("  steps=%d  cfg=%.1f  denoise=%.2f  seed=%d"
               % (steps, cfg, denoise, seed))
@@ -429,6 +479,10 @@ def _declare_ui():
         "clip2comfy.check", "Check server", _check_server, icon="settings",
         help="Check that the ComfyUI server answers and list its first checkpoint")
     sf.ui.action(
+        "clip2comfy.server", "Set server", _ask_server, icon="file-code",
+        help="Type the ComfyUI address (host:port or http://host:port). HOST and "
+             "PORT can also be edited at the top of the script")
+    sf.ui.action(
         "clip2comfy.choose", "Choose folder", _choose_folder, icon="box",
         help="Choose where the generated images are saved")
     sf.ui.action(
@@ -438,7 +492,7 @@ def _declare_ui():
     panel = sf.ui.panel("clip2comfy", "Clip to Comfy")
     panel.label("Clipboard image -> ComfyUI img2img -> image viewer")
     panel.label("Prompt: " + PROMPT)
-    panel.label("Server: " + SERVER)
+    panel.label("Server: " + SERVER + " (click Set server to change)")
     panel.separator()
     panel.label("Model settings")
     panel.slider("steps", "Steps", STEPS, 1, 60, integer=True)
@@ -452,6 +506,7 @@ def _declare_ui():
     panel.button("clip2comfy.run", label="Run in ComfyUI")
     panel.button("clip2comfy.last", label="Open last image")
     panel.button("clip2comfy.check", label="Check server")
+    panel.button("clip2comfy.server", label="Set server")
     panel.separator()
     panel.button("clip2comfy.choose", label="Choose folder")
     panel.button("clip2comfy.folder", label="Open folder")
