@@ -10,6 +10,7 @@
 import sculptforge as sf
 
 SOLIDIFY = 0.151
+VOXEL = 48
 DECIMATE = 25
 QUADREMESH = 400
 BALLOON = 80
@@ -46,6 +47,16 @@ def _try(command, **params):
         return False
 
 
+def _voxel_remesh(resolution):
+    """Rebuild the surface as an even, watertight voxel remesh (skipped when 0)."""
+    value = int(round(float(resolution)))
+    if value <= 0:
+        return
+    value = max(32, min(4096, value))
+    if not _try("remesh", resolution=value):
+        print("  Voxel remesh left out; the mesh keeps its current topology.")
+
+
 def _decimate(percent, stage):
     """Decimate to this percentage of triangles kept (skipped when 0)."""
     value = float(percent)
@@ -69,16 +80,17 @@ def _quad_remesh(quads, group):
         print("  Quad remesh left out; the mesh keeps its current topology.")
 
 
-def blob_it_02(thickness=SOLIDIFY, decimate=DECIMATE, quadremesh=QUADREMESH,
-               balloon=BALLOON, symmetric=SYMMETRIC,
+def blob_it_02(thickness=SOLIDIFY, voxel=VOXEL, decimate=DECIMATE,
+               quadremesh=QUADREMESH, balloon=BALLOON, symmetric=SYMMETRIC,
                symmetry_axis=SYMMETRY_AXIS, keep_groups=KEEP_GROUPS,
                hide_source=HIDE_SOURCE, name=""):
     """Turn the unmasked area of the active Part into a solid, sculptable mesh.
 
     The Part must be masked: the mask is copied with the duplicate, inverted,
     the masked part deleted (so only the unmasked area stays), the leftover
-    mask cleared, then the surface is solidified, decimated, quad remeshed,
-    made symmetric (with a second quad remesh) and inflated with Balloon.
+    mask cleared, then the surface is solidified, voxel remeshed, decimated,
+    quad remeshed, made symmetric (with a second quad remesh) and inflated
+    with Balloon.
 
     `thickness` is Solidify's value: a fraction of the largest side (0.151 is
     15.1 %, negative grows in front of the surface, 0 leaves it single-sided).
@@ -112,6 +124,7 @@ def blob_it_02(thickness=SOLIDIFY, decimate=DECIMATE, quadremesh=QUADREMESH,
           % (source_name, masked, total, total - masked))
     print("  Solidify: %.3f of the longest side (%.1f %%)."
           % (float(thickness), float(thickness) * 100.0))
+    print("  Voxel remesh: %d voxels across the longest side." % int(round(float(voxel))))
     print("  Decimate: %.0f %% of the triangles kept." % float(decimate))
 
     if not _try("part_duplicate"):
@@ -135,6 +148,8 @@ def blob_it_02(thickness=SOLIDIFY, decimate=DECIMATE, quadremesh=QUADREMESH,
             print("  Solidify left out; the surface stays single-sided.")
     else:
         print("  Solidify: thickness 0, the surface stays single-sided.")
+
+    _voxel_remesh(voxel)
 
     _decimate(decimate, "before the quad remesh")
 
@@ -185,6 +200,7 @@ def _run_from_panel():
         thickness = SOLIDIFY
     blob_it_02(
         thickness=thickness,
+        voxel=int(_panel_value("voxel", VOXEL)),
         decimate=int(_panel_value("decimate", DECIMATE)),
         quadremesh=int(_panel_value("quadremesh", QUADREMESH)),
         symmetric=bool(_panel_value("symmetric", SYMMETRIC)),
@@ -285,6 +301,7 @@ def _declare_ui():
     panel.label("Solidify thickness: a fraction of the longest side "
                 "(0.151 = 15.1 %; 0 keeps the surface single-sided)")
     panel.slider("solidify", "Solidify thickness (of the side)", SOLIDIFY, -1.0, 1.0)
+    panel.slider("voxel", "Voxel remesh (voxels)", VOXEL, 32, 64, integer=True)
     panel.slider("decimate", "Decimate (% kept, 0 = off)",
                  DECIMATE, 0, 100, integer=True)
     panel.slider("quadremesh", "Quad remesh (quads, 0 = off)",
